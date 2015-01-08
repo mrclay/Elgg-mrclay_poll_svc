@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin_manifest xmlns="http://www.elgg.org/plugin_manifest/1.8">
+    <name>Polling Service API</name>
+    <id>mrclay_poll_svc</id>
+    <author>Steve Clay</author>
+    <version>1.9.0</version>
+    <description>Provides a polling service for &quot;real-time&quot; plugins</description>
+    <website>http://www.mrclay.org/</website>
+    <license>The BSD 3-Clause License</license>
+    <requires>
+        <type>elgg_release</type>
+        <version>1.9</version>
+    </requires>
+</plugin_manifest>
