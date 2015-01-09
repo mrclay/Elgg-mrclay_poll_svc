@@ -3,31 +3,47 @@
 namespace MrClay\Elgg\PollService;
 
 use MrClay\Elgg\PollService;
+use MrClay\LightPolling\ChannelCollection;
 
 /**
- * Update the timestamp on a user's stream
+ * Ping a channel so the client is notified changes are available
  *
  * @api
  * @param int $user_guid
- * @param string $stream_name
+ * @param string|string[] $channel
  */
-function update_stream($user_guid, $stream_name) {
-	$coll = _poll_service()->getUserStreams($user_guid);
-	$coll->touchStream($stream_name);
-	$coll->save();
+function ping_channel($user_guid, $channel) {
+	_poll_service()->useCollection($user_guid, function (ChannelCollection $collection) use ($channel) {
+		foreach ((array)$channel as $name) {
+			$collection->pingChannel($name);
+		}
+	});
 }
 
 /**
- * Delete a stream that no longer needs to be tracked
+ * Delete a channel no longer needed
  *
  * @api
  * @param int $user_guid
- * @param string $stream_name
+ * @param string|string[] $channel
  */
-function delete_stream($user_guid, $stream_name) {
-	$coll = _poll_service()->getUserStreams($user_guid);
-	$coll->deleteStream($stream_name);
-	$coll->save();
+function delete_channel($user_guid, $channel) {
+	_poll_service()->useCollection($user_guid, function (ChannelCollection $collection) use ($channel) {
+		foreach ((array)$channel as $name) {
+			$collection->deleteChannel($name);
+		}
+	});
+}
+
+/**
+ * Read the last ping time of each channel tracked
+ *
+ * @api
+ * @param int $user_guid
+ * @return \int[] name => timestamp
+ */
+function get_channel_times($user_guid) {
+	return _poll_service()->loadCollection($user_guid)->getChannelTimes();
 }
 
 /**
@@ -37,11 +53,11 @@ function delete_stream($user_guid, $stream_name) {
 function _poll_service() {
 	static $inst;
 	if ($inst === null) {
-		$inst = new PollService();
+		$inst = PollService::factory();
 	}
 	return $inst;
 }
 
 elgg_register_event_handler('init', 'system', function () {
-
+	
 });

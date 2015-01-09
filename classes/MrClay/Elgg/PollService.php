@@ -2,64 +2,92 @@
 
 namespace MrClay\Elgg;
 
-use MrClay\Elgg\PollService\StreamCollection;
+use MrClay\LightPolling\ChannelCollection;
+use MrClay\LightPolling\FileStorage;
 
 class PollService {
 
-	/**
-	 * Get a user's stream collection. It's your responsibility to save() the collection
-	 * if you modify it.
-	 *
-	 * @param int $user_guid
-	 * @return StreamCollection
-	 */
-	public function getUserStreams($user_guid) {
-		return StreamCollection::factory($user_guid, $this->getFilePath($user_guid));
+	protected $storage;
+
+	public function __construct(FileStorage $storage) {
+		$this->storage = $storage;
 	}
 
 	/**
-	 * Get stream file path
-	 *
-	 * To change the public directory, set $CONFIG->mrclay_poll_svc_public_dir
+	 * Use a channel collection. This function will manage saving the collection afterwards.
 	 *
 	 * @param int $user_guid
-	 * @return string
+	 * @param callable $func Function (will be passed a ChannelCollection)
 	 */
-	public function getFilePath($user_guid) {
-		static $dir;
-		static $key;
+	public function useCollection($user_guid, $func) {
+		$collection = $this->loadCollection($user_guid);
+		$old_time = $collection->getTimeModified();
 
-		if ($dir === null) {
-			$dir = elgg_get_config('mrclay_poll_svc_public_dir');
-			if ($dir) {
-				$dir = rtrim($dir, '/\\');
+		call_user_func($func, $collection);
+
+		$new_time = $collection->getTimeModified();
+		if ($new_time !== $old_time) {
+			if (!$collection->getChannels()) {
+				// deleted
+				$this->deleteCollection($user_guid);
 			} else {
-				$dir = elgg_get_plugins_path() . 'mrclay_poll_svc/public';
+				$this->saveCollection($user_guid, $collection);
+			}
+			$this->storage->write($user_guid, $collection);
+		}
+	}
+
+	/**
+	 * @param int $user_guid
+	 * @param ChannelCollection $collection
+	 */
+	protected function saveCollection($user_guid, ChannelCollection $collection) {
+		$serialized = serialize($collection);
+		elgg_set_plugin_user_setting('collection', $serialized, $user_guid, 'mrclay_poll_svc');
+	}
+
+	/**
+	 * @param int $user_guid
+	 * @return ChannelCollection
+	 */
+	public function loadCollection($user_guid) {
+		$serialized = elgg_get_plugin_user_setting('collection', $user_guid, 'mrclay_poll_svc');
+		if ($serialized) {
+			$collection = unserialize($serialized);
+			if ($collection instanceof ChannelCollection) {
+				return $collection;
 			}
 		}
-		if ($key === null) {
-			$key = $this->getFilenameKey();
-		}
-
-		$mac = hash_hmac('md5', $user_guid, $key, true);
-		$mac = rtrim(strtr(base64_encode($mac), "+/", "-_"), '=');
-
-		return "$dir/$mac.json";
+		return new ChannelCollection();
 	}
 
 	/**
-	 * Get binary key used to generate filenames. The site secret is used to generate
-	 * this, but changing the site secret doesn't change it.
-	 *
-	 * @return string
+	 * @param int $user_guid
 	 */
-	protected function getFilenameKey() {
+	protected function deleteCollection($user_guid) {
+		elgg_unset_plugin_user_setting('collection', $user_guid, 'mrclay_poll_svc');
+	}
+
+	/**
+	 * @return PollService
+	 */
+	public static function factory() {
+		$dir = elgg_get_config('mrclay_poll_svc_public_dir');
+		if ($dir) {
+			$dir = rtrim($dir, '/\\');
+		} else {
+			$dir = elgg_get_plugins_path() . 'mrclay_poll_svc/public';
+		}
+
 		$key = elgg_get_plugin_setting('filename_key', 'mrclay_poll_svc');
 		if (!$key) {
 			$key = sha1(get_site_secret() . time() . "mrclay_poll_svc", true);
 			$key = base64_encode($key);
 			elgg_set_plugin_setting('filename_key', $key, 'mrclay_poll_svc');
 		}
-		return base64_decode($key);
+		$key = base64_decode($key);
+
+		$storage = new FileStorage($dir, $key);
+		return new self($storage);
 	}
 }
