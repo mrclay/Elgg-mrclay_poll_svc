@@ -25,29 +25,32 @@ class FileStorage {
 	/**
 	 * Get JSON file path
 	 *
-	 * @param string $client_id
+	 * @param string $connection_name
 	 * @return string
 	 */
-	public function getFilePath($client_id) {
-		$mac = hash_hmac('md5', $client_id, $this->key, true);
+	public function getFilePath($connection_name) {
+		$mac = hash_hmac('md5', $connection_name, $this->key, true);
 		$mac = rtrim(strtr(base64_encode($mac), "+/", "-_"), '=');
 
-		return "{$this->dir}/$mac.json";
+		$subdir = substr($mac, 0, 2);
+		$base = substr($mac, 2);
+
+		return "{$this->dir}/$subdir/$base.json";
 	}
 
 	/**
 	 * Write the JSON file
 	 *
-	 * @param string $client_id
-	 * @param ChannelCollection $collection
+	 * @param string $connection_name
+	 * @param Connection $collection
 	 * @throws \RuntimeException
 	 */
-	public function write($client_id, ChannelCollection $collection) {
-		$path = $this->getFilePath($client_id);
+	public function write($connection_name, Connection $collection) {
+		$path = $this->getFilePath($connection_name);
 
 		if (file_exists($path) && !is_writable($path)) {
 			$basename = basename($path);
-			throw new \RuntimeException("channel file not writable: $basename");
+			throw new \RuntimeException("connection file not writable: $basename");
 		}
 
 		$channels = $collection->getChannels();
@@ -58,8 +61,13 @@ class FileStorage {
 			$json = "{}";
 		}
 
+		$subdir = dirname($path);
+		if (!is_dir($subdir)) {
+			mkdir($subdir);
+		}
+
 		// try atomic
-		$tempnam = tempnam($this->dir, $client_id);
+		$tempnam = tempnam($this->dir, $connection_name);
 		if (!$tempnam) {
 			file_put_contents($path, $json);
 			return;

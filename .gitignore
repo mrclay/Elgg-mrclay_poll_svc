@@ -14,7 +14,7 @@ Desktop.ini
 /vendor/*
 
 # ignore stream files
-/public/*.json
+/public/*/*.json
 
 # keep some hiddens
 !.htaccess

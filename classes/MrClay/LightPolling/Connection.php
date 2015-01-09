@@ -3,9 +3,9 @@
 namespace MrClay\LightPolling;
 
 /**
- * Collection of pingable "channels". This object is designed to be serialized between requests
+ * Collection of pingable channels. This object is designed to be serialized between requests
  */
-class ChannelCollection {
+class Connection {
 
 	/**
 	 * Do not change!
@@ -35,7 +35,7 @@ class ChannelCollection {
 			$time = time();
 		}
 		$this->channels[(string)$name][self::KEY_TIME] = (int)$time;
-		$this->time_modified = time();
+		$this->touch();
 	}
 
 	/**
@@ -53,7 +53,7 @@ class ChannelCollection {
 	 */
 	public function deleteChannel($name) {
 		unset($this->channels[$name]);
-		$this->time_modified = time();
+		$this->touch();
 	}
 
 	/**
@@ -70,6 +70,10 @@ class ChannelCollection {
 		return array_map(function ($channel) {
 			return $channel[self::KEY_TIME];
 		}, $this->channels);
+	}
+
+	public function touch() {
+		$this->time_modified = time();
 	}
 
 	/**

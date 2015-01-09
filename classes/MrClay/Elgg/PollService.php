@@ -2,25 +2,60 @@
 
 namespace MrClay\Elgg;
 
-use MrClay\LightPolling\ChannelCollection;
+use MrClay\LightPolling\Connection;
 use MrClay\LightPolling\FileStorage;
 
 class PollService {
 
+	const METADATA_KEY = 'poll_svc_connection';
+
 	protected $storage;
+
+	protected $connection_guids = array();
 
 	public function __construct(FileStorage $storage) {
 		$this->storage = $storage;
 	}
 
 	/**
-	 * Use a channel collection. This function will manage saving the collection afterwards.
-	 *
-	 * @param int $user_guid
-	 * @param callable $func Function (will be passed a ChannelCollection)
+	 * @param \ElggEntity $entity
 	 */
-	public function useCollection($user_guid, $func) {
-		$collection = $this->loadCollection($user_guid);
+	public function requestConnection(\ElggEntity $entity) {
+		$this->connection_guids[$entity->guid] = true;
+	}
+
+	/**
+	 * Create an empty connection (and file) if they don't exist
+	 *
+	 * @param \ElggEntity $entity
+	 */
+	public function initConnection(\ElggEntity $entity) {
+		$this->useConnection($entity, function (Connection $conn) {
+			if (!$conn->getTimeModified()) {
+				$conn->touch();
+			}
+		});
+	}
+
+	/**
+	 * @return int[]
+	 */
+	public function getRequestedConnections() {
+		return array_keys($this->connection_guids);
+	}
+
+	/**
+	 * Use a channel collection. This function will manage persisting the connection afterwards.
+	 *
+	 * @param \ElggEntity $entity
+	 * @param callable $func Function (will be passed the Connection)
+	 */
+	public function useConnection(\ElggEntity $entity, $func) {
+		if (!$entity->guid) {
+			throw new \InvalidArgumentException('$entity must be saved first.');
+		}
+
+		$collection = $this->loadConnection($entity);
 		$old_time = $collection->getTimeModified();
 
 		call_user_func($func, $collection);
@@ -29,43 +64,55 @@ class PollService {
 		if ($new_time !== $old_time) {
 			if (!$collection->getChannels()) {
 				// deleted
-				$this->deleteCollection($user_guid);
+				$this->deleteConnection($entity);
 			} else {
-				$this->saveCollection($user_guid, $collection);
+				$this->saveConnection($entity, $collection);
 			}
-			$this->storage->write($user_guid, $collection);
+			$this->storage->write($entity->guid, $collection);
 		}
 	}
 
 	/**
-	 * @param int $user_guid
-	 * @param ChannelCollection $collection
+	 * @param int $guid
+	 * @return string
 	 */
-	protected function saveCollection($user_guid, ChannelCollection $collection) {
-		$serialized = serialize($collection);
-		elgg_set_plugin_user_setting('collection', $serialized, $user_guid, 'mrclay_poll_svc');
+	public function getConnectionFile($guid) {
+		return $this->storage->getFilePath($guid);
 	}
 
 	/**
-	 * @param int $user_guid
-	 * @return ChannelCollection
+	 * @param \ElggEntity $entity
+	 * @param Connection $collection
 	 */
-	public function loadCollection($user_guid) {
-		$serialized = elgg_get_plugin_user_setting('collection', $user_guid, 'mrclay_poll_svc');
+	protected function saveConnection(\ElggEntity $entity, Connection $collection) {
+		$serialized = serialize($collection);
+		$ia = elgg_set_ignore_access(true);
+		$entity->setMetadata(self::METADATA_KEY, $serialized, '', false, 0, ACCESS_PUBLIC);
+		elgg_set_ignore_access($ia);
+	}
+
+	/**
+	 * @param \ElggEntity $entity
+	 * @return Connection
+	 */
+	public function loadConnection(\ElggEntity $entity) {
+		$serialized = $entity->getMetadata(self::METADATA_KEY);
 		if ($serialized) {
 			$collection = unserialize($serialized);
-			if ($collection instanceof ChannelCollection) {
+			if ($collection instanceof Connection) {
 				return $collection;
 			}
 		}
-		return new ChannelCollection();
+		return new Connection();
 	}
 
 	/**
-	 * @param int $user_guid
+	 * @param \ElggEntity $entity
 	 */
-	protected function deleteCollection($user_guid) {
-		elgg_unset_plugin_user_setting('collection', $user_guid, 'mrclay_poll_svc');
+	protected function deleteConnection(\ElggEntity $entity) {
+		$ia = elgg_set_ignore_access(true);
+		$entity->deleteMetadata(self::METADATA_KEY);
+		elgg_set_ignore_access($ia);
 	}
 
 	/**
