@@ -94,7 +94,7 @@ define('mrclay_poll_svc', function (require) {
          * where GUID identifies the connection.
          *
          * @api
-         * @param {String} name (optional)
+         * @param {String} name Optional channel name
          * @param {Function} handler This handler will receive a single Update object
          */
         this.onUpdate = function (name, handler) {
@@ -141,16 +141,16 @@ define('mrclay_poll_svc', function (require) {
             $.each(data, function (key, val) {
                 if (last_data[key]) {
                     if (last_data[key].t !== val.t) {
-                        updates[key] = new Update('ping', new Date(val.t * 1000));
+                        updates[key] = new Update(key, 'ping', new Date(val.t * 1000));
                     }
                 } else {
-                    updates[key] = new Update('create', new Date(val.t * 1000));
+                    updates[key] = new Update(key, 'create', new Date(val.t * 1000));
                 }
             });
 
             $.each(last_data, function (key, val) {
                 if (!data[key]) {
-                    updates[key] = new Update('delete', null);
+                    updates[key] = new Update(key 'delete', null);
                 }
             });
 
@@ -168,7 +168,8 @@ define('mrclay_poll_svc', function (require) {
         };
     }
 
-    function Update(action, time) {
+    function Update(channel, action, time) {
+        this.channel = channel;
         this.action = action;
         this.time = time;
     }
