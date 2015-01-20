@@ -112,6 +112,8 @@ define('mrclay_poll_svc', function (require) {
 
         /**
          * Start polling
+         * 
+         * @internal
          */
         this.start = function () {
             if (!started) {
@@ -124,6 +126,7 @@ define('mrclay_poll_svc', function (require) {
          * Update data
          *
          * @param {Object} data object from the JSON file
+         * @internal
          */
         this.receiveData = function (data) {
             if (!data) {
@@ -134,16 +137,16 @@ define('mrclay_poll_svc', function (require) {
             $.each(data, function (key, val) {
                 if (last_data[key]) {
                     if (last_data[key].t !== val.t) {
-                        updates[key] = new Update(key, 'ping', new Date(val.t * 1000));
+                        updates[key] = new Update(guid, key, 'ping', new Date(val.t * 1000));
                     }
                 } else {
-                    updates[key] = new Update(key, 'create', new Date(val.t * 1000));
+                    updates[key] = new Update(guid, key, 'create', new Date(val.t * 1000));
                 }
             });
 
             $.each(last_data, function (key, val) {
                 if (!data[key]) {
-                    updates[key] = new Update(key 'delete', null);
+                    updates[key] = new Update(guid, key 'delete', null);
                 }
             });
 
@@ -159,9 +162,17 @@ define('mrclay_poll_svc', function (require) {
 
             last_data = data;
         };
+        
+        /**
+         * @param {String} name Channel name
+         */
+        this.hasChannel = function (name) {
+            return !!last_data[name];
+        };
     }
 
-    function Update(channel, action, time) {
+    function Update(guid, channel, action, time) {
+        this.guid = guid;
         this.channel = channel;
         this.action = action;
         this.time = time;
@@ -219,6 +230,29 @@ define('mrclay_poll_svc', function (require) {
         getNames: function () {
             return $.map(connections, function(connection, name) {
                 return name;
+            });
+        },
+        
+        /**
+         * Register a handler to receive channel updates on any available connection.
+         *
+         * @api
+         * @param {String} name Optional channel name
+         * @param {Function} handler This handler will receive a single Update object
+         */
+        onChannelUpdate: function (name, handler) {
+            // register handler
+            elgg.register_hook_handler('mrclay_poll_svc', 'all', function (h, t, p, v) {
+                if (p.updates[name]) {
+                    handler(p.updates[name]);
+                }
+            });
+            
+            // start connections with that channel
+            $.each(connections, function (guid, connection) {
+                if (connection.hasChannel(name)) {
+                    connection.start();
+                }
             });
         }
     };
