@@ -31,23 +31,16 @@ define('mrclay_poll_svc', function (require) {
             waiting = false,
             stopped = false;
 
-        function schedulePool() {
-            setTimeout(poll, delay);
+        function scheduleNextRequest() {
+            setTimeout(makeRequest, delay);
 
             var delta = (targetDelay - delay);
             delay += delta * .1;
         }
 
-        function schedulePool() {
-            setTimeout(poll, delay);
-
-            var delta = (targetDelay - delay);
-            delay += delta * .1;
-        }
-
-        function poll() {
+        function makeRequest() {
             if (waiting) {
-                setTimeout(poll, 1000);
+                setTimeout(makeRequest, 1000);
                 return;
             }
 
@@ -62,7 +55,7 @@ define('mrclay_poll_svc', function (require) {
             });
 
             if (!stopped) {
-                schedulePool();
+                scheduleNextRequest();
             }
         }
 
@@ -123,7 +116,7 @@ define('mrclay_poll_svc', function (require) {
         this.start = function () {
             if (!started) {
                 started = true;
-                schedulePool();
+                scheduleNextRequest();
             }
         };
 
