@@ -14,7 +14,7 @@ define(function (require) {
         // listen for particular events
         conn.onUpdate('comments', function (update) {
             // an update occurred! update the comments list
-            console.log(update); // {action:'ping',time:1421766150}
+            console.log(update); // {channel:"comments",action:"ping",time:<Date>}
         });
         
         // listen to all events on the entity
