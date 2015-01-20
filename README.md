@@ -9,6 +9,8 @@ Using the service to listen for any server-side "comments" events:
 define(function (require) {
     var svc = require('mrclay_poll_svc');
 
+    // This lets the HTML page determine which entities to listen for. If the page hasn't used
+    // request_connection(), no connections will be monitored.
     svc.onChannelUpdate("comments", function (update) {
         // an update occurred!
         console.log(update); // {guid:123,channel:"comments",action:"ping",time:<Date>}
