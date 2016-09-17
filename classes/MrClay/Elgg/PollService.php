@@ -4,17 +4,20 @@ namespace MrClay\Elgg;
 
 use MrClay\LightPolling\Connection;
 use MrClay\LightPolling\FileStorage;
+use ElggFileCache;
 
 class PollService {
 
 	const METADATA_KEY = 'poll_svc_connection';
 
 	protected $storage;
+	protected $cache;
 
 	protected $connection_guids = array();
 
-	public function __construct(FileStorage $storage) {
+	public function __construct(FileStorage $storage, ElggFileCache $cache) {
 		$this->storage = $storage;
+		$this->cache = $cache;
 	}
 
 	/**
@@ -25,14 +28,29 @@ class PollService {
 	}
 
 	/**
+	 * Add channel(s) to a connection
+	 *
+	 * @param \ElggEntity     $entity
+	 * @param string|string[] $channels
+	 */
+	public function addChannels(\ElggEntity $entity, $channels) {
+		$channels = (array)$channels;
+		$this->useConnection($entity, function (Connection $connection) use ($channels) {
+			foreach ($channels as $channel) {
+				$connection->addChannel($channel);
+			}
+		});
+	}
+
+	/**
 	 * Create an empty connection (and file) if they don't exist
 	 *
 	 * @param \ElggEntity $entity
 	 */
 	public function initConnection(\ElggEntity $entity) {
-		$this->useConnection($entity, function (Connection $conn) {
-			if (!$conn->getTimeModified()) {
-				$conn->touch();
+		$this->useConnection($entity, function (Connection $connection) {
+			if (!$connection->getTimeModified()) {
+				$connection->touch();
 			}
 		});
 	}
@@ -55,20 +73,17 @@ class PollService {
 			throw new \InvalidArgumentException('$entity must be saved first.');
 		}
 
-		$collection = $this->loadConnection($entity);
-		$old_time = $collection->getTimeModified();
+		$connection = $this->loadConnection($entity);
+		$old_time = $connection->getTimeModified();
 
-		call_user_func($func, $collection);
+		call_user_func($func, $connection);
 
-		$new_time = $collection->getTimeModified();
+		$new_time = $connection->getTimeModified();
 		if ($new_time !== $old_time) {
-			if (!$collection->getChannels()) {
-				// deleted
-				$this->deleteConnection($entity);
-			} else {
-				$this->saveConnection($entity, $collection);
-			}
-			$this->storage->write($entity->guid, $collection);
+			// TODO under what conditions should we deleteConnection()? Problem is that until the
+			// first ping, there won't be a connection for the client to listen to.
+			$this->saveConnection($entity, $connection);
+			$this->storage->write($entity->guid, $connection);
 		}
 	}
 
@@ -82,13 +97,11 @@ class PollService {
 
 	/**
 	 * @param \ElggEntity $entity
-	 * @param Connection $collection
+	 * @param Connection  $connection
 	 */
-	protected function saveConnection(\ElggEntity $entity, Connection $collection) {
-		$serialized = serialize($collection);
-		$ia = elgg_set_ignore_access(true);
-		$entity->setMetadata(self::METADATA_KEY, $serialized, '', false, 0, ACCESS_PUBLIC);
-		elgg_set_ignore_access($ia);
+	protected function saveConnection(\ElggEntity $entity, Connection $connection) {
+		$serialized = serialize($connection);
+		$this->cache->save("poll_svc_{$entity->guid}", $serialized);
 	}
 
 	/**
@@ -96,23 +109,25 @@ class PollService {
 	 * @return Connection
 	 */
 	public function loadConnection(\ElggEntity $entity) {
-		$serialized = $entity->getMetadata(self::METADATA_KEY);
+		$serialized = $this->cache->load("poll_svc_{$entity->guid}");
 		if ($serialized) {
-			$collection = unserialize($serialized);
-			if ($collection instanceof Connection) {
-				return $collection;
+			$connection = unserialize($serialized);
+			if ($connection instanceof Connection) {
+				return $connection;
 			}
 		}
 		return new Connection();
+	}
+
+	public function deleteAll() {
+		$this->storage->deleteAll();
 	}
 
 	/**
 	 * @param \ElggEntity $entity
 	 */
 	protected function deleteConnection(\ElggEntity $entity) {
-		$ia = elgg_set_ignore_access(true);
-		$entity->deleteMetadata(self::METADATA_KEY);
-		elgg_set_ignore_access($ia);
+		$this->cache->delete("poll_svc_{$entity->guid}");
 	}
 
 	/**
@@ -135,6 +150,6 @@ class PollService {
 		$key = base64_decode($key);
 
 		$storage = new FileStorage($dir, $key);
-		return new self($storage);
+		return new self($storage, elgg_get_system_cache());
 	}
 }

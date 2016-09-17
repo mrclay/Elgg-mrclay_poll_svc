@@ -6,12 +6,7 @@
  */
 
 $svc = \MrClay\Elgg\PollService\_poll_service();
-
-$user = elgg_get_logged_in_user_entity();
-if ($user) {
-	$svc->initConnection($user);
-	$svc->requestConnection($user);
-}
+/* @var \MrClay\Elgg\PollService $svc */
 
 $path = rtrim(elgg_get_config('mrclay_poll_svc_public_path'), '/');
 if (!$path) {
@@ -25,7 +20,6 @@ $view_vars = array(
 );
 $json = elgg_view('mrclay_poll_svc/page_data', $view_vars, false, false, 'json');
 
-if (false): ?><script><?php endif;
-
 ?>
+//<script>
 var mrclay_poll_svc_data = <?= $json ?>;

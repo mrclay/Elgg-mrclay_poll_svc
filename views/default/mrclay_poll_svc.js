@@ -10,10 +10,6 @@ define('mrclay_poll_svc', function (require) {
     var elgg = require('elgg'),
         $ = require('jquery');
 
-    if (!window.mrclay_poll_svc_data) {
-        return;
-    }
-
     function Connection(guid, data) {
         // delay for the next request
         var self = this,
@@ -137,16 +133,16 @@ define('mrclay_poll_svc', function (require) {
             $.each(data, function (key, val) {
                 if (last_data[key]) {
                     if (last_data[key].t !== val.t) {
-                        updates[key] = new Update(guid, key, 'ping', new Date(val.t * 1000));
+                        updates[key] = new Update(guid, key, 'ping', new Date(val.t * 1000), val.m);
                     }
                 } else {
-                    updates[key] = new Update(guid, key, 'create', new Date(val.t * 1000));
+                    updates[key] = new Update(guid, key, 'create', new Date(val.t * 1000), val.m);
                 }
             });
 
             $.each(last_data, function (key, val) {
                 if (!data[key]) {
-                    updates[key] = new Update(guid, key 'delete', null);
+                    updates[key] = new Update(guid, key, 'delete', null);
                 }
             });
 
@@ -171,11 +167,12 @@ define('mrclay_poll_svc', function (require) {
         };
     }
 
-    function Update(guid, channel, action, time) {
+    function Update(guid, channel, action, time, messages) {
         this.guid = guid;
         this.channel = channel;
         this.action = action;
         this.time = time;
+        this.messages = messages;
     }
 
     /**
@@ -185,11 +182,13 @@ define('mrclay_poll_svc', function (require) {
 
     // you only have connections that were given by the page
     // TODO allow requesting a new connection
-    $.each(mrclay_poll_svc_data, function (guid, init) {
-        if (typeof init === 'object') {
-            connections[guid] = new Connection(guid, init);
-        }
-    });
+    if (window.mrclay_poll_svc_data) {
+        $.each(mrclay_poll_svc_data, function (guid, init) {
+            if (typeof init === 'object') {
+                connections[guid] = new Connection(guid, init);
+            }
+        });
+    }
 
     var exports = {
         /**

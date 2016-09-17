@@ -53,17 +53,19 @@ class FileStorage {
 			throw new \RuntimeException("connection file not writable: $basename");
 		}
 
-		$channels = $collection->getChannels();
-		if ($channels) {
-			$json = json_encode($collection->getChannels());
-		} else {
-			// make sure we get an object!
-			$json = "{}";
-		}
+		$json = json_encode((object)$collection->getChannels());
 
 		$subdir = dirname($path);
 		if (!is_dir($subdir)) {
-			mkdir($subdir);
+			mkdir($subdir, 0755);
+		}
+
+		// don't allow directory indexes
+		if (!file_exists("{$this->dir}/index.html")) {
+			file_put_contents("{$this->dir}/index.html", "");
+		}
+		if (!file_exists("$subdir/index.html")) {
+			file_put_contents("$subdir/index.html", "");
 		}
 
 		// try atomic
@@ -79,5 +81,38 @@ class FileStorage {
 			copy($tempnam, $path);
 			unlink($tempnam);
 		}
+
+		chmod($path, 0644);
+	}
+
+	/**
+	 * Get storage directory (no trailing slash)
+	 *
+	 * @return string
+	 */
+	public function getDir() {
+		return $this->dir;
+	}
+
+	public function deleteAll() {
+		$this->rmdir($this->dir, true);
+	}
+
+	protected function rmdir($dir, $empty = false) {
+		$files = array_diff(scandir($dir), array('.', '..'));
+
+		foreach ($files as $file) {
+			if (is_dir("$dir/$file")) {
+				$this->rmdir("$dir/$file");
+			} else {
+				unlink("$dir/$file");
+			}
+		}
+
+		if ($empty) {
+			return true;
+		}
+
+		return rmdir($dir);
 	}
 }

@@ -13,8 +13,8 @@ Desktop.ini
 # ignore Composer downloads
 /vendor/*
 
-# ignore stream files
-/public/*/*.json
+# ignore public files
+/public/*
 
 # keep some hiddens
 !.htaccess
