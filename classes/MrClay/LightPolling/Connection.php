@@ -63,10 +63,13 @@ class Connection {
 	 * @param int    $storage_limit How many messages to keep in channel history
 	 */
 	public function addMessage($channel_name, $message, $storage_limit = 10) {
-		$this->channels[(string)$channel_name][self::KEY_MESSAGES][] = $message;
+		if (!isset($this->channels[(string)$channel_name][self::KEY_MESSAGES])) {
+			$this->channels[(string)$channel_name][self::KEY_MESSAGES] = [];
+		}
 
 		$msgs =& $this->channels[(string)$channel_name][self::KEY_MESSAGES];
-		$msgs = array_slice($msgs, - $storage_limit);
+		array_unshift($msgs, $message);
+		$msgs = array_slice($msgs, 0, $storage_limit);
 
 		$this->pingChannel($channel_name);
 	}

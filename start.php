@@ -141,62 +141,64 @@ function _init() {
 
 	elgg_extend_view('js/initialize_elgg', 'mrclay_poll_svc/page_data');
 
-	// testing code
-	if (false) {
-		// pages with comments: set up stream monitoring
-		if (elgg_is_logged_in()) {
-			elgg_register_plugin_hook_handler('view', 'page/elements/comments', function ($h, $t, $v, $p) {
-				$entity = $p['vars']['entity'];
+	// the following demo code pushes comment excerpts and likes into channels
+	// and on pages with comment listings logged in user clients will listen
+	// for updates.
+	return;
 
-				elgg_require_js('mrclay_poll_svc_test');
+	// pages with comments: set up stream monitoring
+	if (elgg_is_logged_in()) {
+		elgg_register_plugin_hook_handler('view', 'page/elements/comments', function ($h, $t, $v, $p) {
+			$entity = $p['vars']['entity'];
 
-				// tell server about needed channels and to push current channel data
-				// to the client so it doesn't need to poll immediately.
-				add_channels($entity, ['comments', 'likes']);
-				request_connection($entity);
-			});
-		}
+			elgg_require_js('mrclay_poll_svc_test');
 
-		// push comment excerpts into stream
-		elgg_register_event_handler('create', 'object', function ($e, $t, \ElggObject $object) {
-			if (!$object instanceof \ElggComment) {
-				return;
-			}
-
-			$owner = $object->getOwnerEntity();
-			/* @var \ElggUser $owner */
-			$msg = [
-				'owner' => [
-					'guid' => $owner->guid,
-					'name' => $owner->name,
-					'username' => $owner->username,
-					'icon' => $owner->getIconURL(['size' => 'tiny']),
-				],
-				'excerpt' => elgg_get_excerpt($object->description),
-				'guid' => $object->guid,
-			];
-			add_message($object->getContainerEntity(), $msg, 'comments');
-		});
-
-		// push likes into stream
-		elgg_register_event_handler('create', 'annotation', function ($e, $t, \ElggAnnotation $a) {
-			if ($a->name !== 'likes') {
-				return;
-			}
-
-			$owner = $a->getOwnerEntity();
-			/* @var \ElggUser $owner */
-			$msg = [
-				'owner' => [
-					'guid' => $owner->guid,
-					'name' => $owner->name,
-					'username' => $owner->username,
-					'icon' => $owner->getIconURL(['size' => 'tiny']),
-				],
-			];
-			add_message($a->getEntity(), $msg, 'likes');
+			// tell server about needed channels and to push current channel data
+			// to the client so it doesn't need to poll immediately.
+			add_channels($entity, ['comments', 'likes']);
+			request_connection($entity);
 		});
 	}
+
+	// push comment excerpts into stream
+	elgg_register_event_handler('create', 'object', function ($e, $t, \ElggObject $object) {
+		if (!$object instanceof \ElggComment) {
+			return;
+		}
+
+		$owner = $object->getOwnerEntity();
+		/* @var \ElggUser $owner */
+		$msg = [
+			'owner' => [
+				'guid' => $owner->guid,
+				'name' => $owner->name,
+				'username' => $owner->username,
+				'icon' => $owner->getIconURL(['size' => 'tiny']),
+			],
+			'excerpt' => elgg_get_excerpt($object->description),
+			'guid' => $object->guid,
+		];
+		add_message($object->getContainerEntity(), $msg, 'comments');
+	});
+
+	// push likes into stream
+	elgg_register_event_handler('create', 'annotation', function ($e, $t, \ElggAnnotation $a) {
+		if ($a->name !== 'likes') {
+			return;
+		}
+
+		$owner = $a->getOwnerEntity();
+		/* @var \ElggUser $owner */
+		$msg = [
+			'owner' => [
+				'guid' => $owner->guid,
+				'name' => $owner->name,
+				'username' => $owner->username,
+				'icon' => $owner->getIconURL(['size' => 'tiny']),
+			],
+		];
+		add_message($a->getEntity(), $msg, 'likes');
+	});
 }
 
 function _flush() {
